@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SprintRoute // Private Sprint Orienteering Practice</title>
+    <meta name="description" content="Draw, plan, and analyze your sprint orienteering route choices on private maps locally in your browser. Secure, client-side, with metadata embedded in images.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app-root" class="app-layout">
+        <!-- Left Sidebar Panel -->
+        <aside id="sidebar-panel" class="sidebar">
+            <header class="sidebar-header">
+                <div class="logo-area">
+                    <span class="logo-icon">▲</span>
+                    <h1 class="logo-title">Sprint<span class="highlight">Route</span></h1>
+                </div>
+                <p class="logo-subtitle">Private Route Choice Practice</p>
+            </header>
+
+            <div class="sidebar-scrollable">
+                <!-- PANEL 1: Load Map -->
+                <section id="panel-load-map" class="panel-section active">
+                    <h2 class="panel-title">
+                        <span class="step-badge">1</span>
+                        <span>Load Map Image</span>
+                    </h2>
+                    
+                    <div id="dropzone" class="dropzone-container">
+                        <div class="dropzone-message">
+                            <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                            </svg>
+                            <span class="dropzone-primary-text">Drag & drop map image</span>
+                            <span class="dropzone-secondary-text">PNG, JPG, WebP (or load metadata-saved image)</span>
+                            <span class="or-divider">or</span>
+                            <label class="btn-primary file-input-label">
+                                Browse Files
+                                <input type="file" id="map-file-input" accept="image/png, image/jpeg, image/webp" style="display: none;">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="map-info-card" class="info-card" style="display: none;">
+                        <div class="info-row">
+                            <span class="info-label">File Name:</span>
+                            <span id="map-name" class="info-value">map.png</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Dimensions:</span>
+                            <span id="map-dimensions" class="info-value">0 x 0 px</span>
+                        </div>
+                        <button id="btn-change-map" class="btn-text-danger">Load different map</button>
+                    </div>
+                </section>
+
+                <!-- PANEL 2: Scale & Calibration -->
+                <section id="panel-calibration" class="panel-section disabled">
+                    <h2 class="panel-title">
+                        <span class="step-badge">2</span>
+                        <span>Map Scale Calibration</span>
+                    </h2>
+                    <div class="panel-body">
+                        <p class="section-desc">To measure your route choices, we need to know the map scale. Choose a method below:</p>
+                        
+                        <div class="tabs-header">
+                            <button id="tab-cal-dpi" class="tab-btn active">DPI & Map Scale</button>
+                            <button id="tab-cal-ruler" class="tab-btn">Manual Ruler</button>
+                        </div>
+
+                        <div class="tabs-content">
+                            <!-- Tab: DPI and Scale -->
+                            <div id="content-cal-dpi" class="tab-pane active">
+                                <div class="form-group">
+                                    <label for="input-map-scale" class="form-label">Map Scale (1 : X)</label>
+                                    <div class="input-with-addon">
+                                        <span class="addon-prefix">1 :</span>
+                                        <input type="number" id="input-map-scale" class="form-control" value="4000" placeholder="4000">
+                                    </div>
+                                    <span class="form-hint">Standard sprint maps are 1:4000 or 1:5000</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="input-dpi" class="form-label">Image Print Resolution (DPI)</label>
+                                    <input type="number" id="input-dpi" class="form-control" value="300" placeholder="300">
+                                    <span class="form-hint">Standard OCAD export resolution is 300 DPI</span>
+                                </div>
+                                <button id="btn-apply-dpi-scale" class="btn-primary btn-full">Set Scale from DPI</button>
+                            </div>
+
+                            <!-- Tab: Manual Ruler -->
+                            <div id="content-cal-ruler" class="tab-pane">
+                                <p class="tab-desc">Click two points on the map with a known real-world distance (e.g. a 100m scale bar or 50m building side).</p>
+                                <button id="btn-start-ruler-cal" class="btn-secondary btn-full">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M21.3 8.7L8.7 21.3c-.4.4-1 .4-1.4 0l-4.6-4.6c-.4-.4-.4-1 0-1.4L15.3 2.7c.4-.4 1-.4 1.4 0l4.6 4.6c.4.4.4 1 0 1.4zM6 16l3 3M8 14l3 3M10 12l3 3M12 10l3 3M14 8l3 3M16 6l3 3"/></svg>
+                                    Draw Calibration Line
+                                </button>
+                                <div id="calibration-ruler-hud" class="ruler-hud" style="display: none;">
+                                    <div class="hud-status">Line length: <span id="ruler-pixel-length" class="highlight">0 px</span></div>
+                                    <div class="form-group" style="margin-top: 8px;">
+                                        <label for="input-ruler-meters" class="form-label">Real-world distance (meters):</label>
+                                        <input type="number" id="input-ruler-meters" class="form-control" value="100" min="1">
+                                    </div>
+                                    <div class="hud-actions">
+                                        <button id="btn-save-ruler-cal" class="btn-primary btn-sm">Apply</button>
+                                        <button id="btn-cancel-ruler-cal" class="btn-secondary btn-sm">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="calibration-result-card" class="result-card" style="display: none;">
+                            <div class="result-row">
+                                <span class="result-label">Current Scale:</span>
+                                <span id="cal-scale-text" class="result-value">1 px = 0.00m</span>
+                            </div>
+                            <div class="result-row">
+                                <span class="result-label">Resolution:</span>
+                                <span id="cal-pixels-meter-text" class="result-value">0.0 px/meter</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 3: Course Editor -->
+                <section id="panel-course" class="panel-section disabled">
+                    <h2 class="panel-title">
+                        <span class="step-badge">3</span>
+                        <span>Course Designer</span>
+                    </h2>
+                    <div class="panel-body">
+                        <p class="section-desc">Create the course layout by adding controls. Coordinates and scale will be saved in the exported file.</p>
+                        
+                        <div class="form-group inline-group" style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                            <label for="select-course" class="form-label" style="margin-bottom: 0; white-space: nowrap; margin-right: 8px;">Active Course:</label>
+                            <select id="select-course" class="form-control" style="width: calc(100% - 100px); padding: 4px 8px; height: 28px; background-color: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-primary);"></select>
+                        </div>
+                        <div class="flex-row gap-2" style="margin-bottom: 12px; display: flex; gap: 6px;">
+                            <button id="btn-add-course" class="btn-secondary" style="flex: 1; padding: 4px 8px; font-size: 10px; font-weight: 600; height: 26px;">+ New Course</button>
+                            <button id="btn-rename-course" class="btn-secondary" style="flex: 1; padding: 4px 8px; font-size: 10px; font-weight: 600; height: 26px;">Rename</button>
+                            <button id="btn-delete-course" class="btn-icon-danger" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); height: 26px; display: flex; align-items: center; justify-content: center;" title="Delete current course">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
+                        <div class="section-divider" style="margin: 12px 0;"></div>
+                        
+                        <div class="tool-grid">
+                            <button id="btn-tool-start" class="tool-btn" title="Place Start Triangle">
+                                <span class="tool-icon triangle">▲</span>
+                                <span class="tool-label">Add Start</span>
+                            </button>
+                            <button id="btn-tool-control" class="tool-btn" title="Place Control Circle">
+                                <span class="tool-icon circle">◯</span>
+                                <span class="tool-label">Add Control</span>
+                            </button>
+                            <button id="btn-tool-finish" class="tool-btn" title="Place Finish Double Circle">
+                                <span class="tool-icon double-circle">◎</span>
+                                <span class="tool-label">Add Finish</span>
+                            </button>
+                            <button id="btn-tool-select-control" class="tool-btn" title="Select / Move Controls">
+                                <span class="tool-icon cursor">✥</span>
+                                <span class="tool-label">Edit Course</span>
+                            </button>
+                        </div>
+
+                        <div id="course-list-container" style="display: none; margin-top: 15px;">
+                            <div class="list-header">
+                                <span class="list-title">Course Controls</span>
+                                <button id="btn-clear-course" class="btn-icon-danger" title="Delete entire course">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                </button>
+                            </div>
+                            <div id="course-control-items" class="control-items-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 4: Practice & Route Drawing -->
+                <section id="panel-practice" class="panel-section disabled">
+                    <h2 class="panel-title">
+                        <span class="step-badge">4</span>
+                        <span>Practice & Route Choice</span>
+                    </h2>
+                    <div class="panel-body">
+                        <button id="btn-start-practice" class="btn-primary btn-full" style="margin-bottom: 12px; background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); border: none; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);">
+                            Start Practice Mode
+                        </button>
+                        <p class="section-desc">Select a leg to draw your route. Draw multiple choices to compare lengths and efficiency.</p>
+                        
+                        <div class="form-group inline-group" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                            <label for="input-runner-name" class="form-label" style="margin-bottom: 0; white-space: nowrap; margin-right: 8px;">Your Name:</label>
+                            <input type="text" id="input-runner-name" class="form-control" style="width: calc(100% - 90px); padding: 4px 8px; height: 28px;" value="Runner 1" placeholder="Enter name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="select-active-leg" class="form-label">Active Leg:</label>
+                            <select id="select-active-leg" class="form-control">
+                                <option value="-1">-- Select a Leg --</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <div id="leg-practice-area" style="display: none;">
+                            <div class="section-divider"></div>
+                            
+                            <div class="list-header" style="margin-top: 10px;">
+                                <span class="list-title">Route Choices</span>
+                                <button id="btn-add-route" class="btn-primary btn-sm" style="padding: 4px 8px;">+ New Route</button>
+                            </div>
+
+                            <div id="route-choices-list" class="route-choices-list">
+                                <!-- Populated dynamically -->
+                            </div>
+
+                            <div class="section-divider"></div>
+
+                            <!-- Settings for comparisons -->
+                            <div class="comparison-settings">
+                                <h3 class="subsection-title">Comparison Pace</h3>
+                                <div class="pace-inputs">
+                                    <div class="form-group inline-group">
+                                        <label for="input-run-pace-min" class="form-label-sm">Pace (min/km):</label>
+                                        <div class="pace-min-sec">
+                                            <input type="number" id="input-run-pace-min" class="form-control-sm" value="3" min="0">
+                                            <span>:</span>
+                                            <input type="number" id="input-run-pace-sec" class="form-control-sm" value="30" min="0" max="59">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="section-divider" style="margin: 12px 0;"></div>
+                            <div class="comparison-settings">
+                                <h3 class="subsection-title">Compare Runner Times</h3>
+                                <div id="runner-comparison-list" class="control-items-list" style="max-height: 180px; overflow-y: auto;">
+                                    <!-- Populated dynamically with checkboxes -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 5: Export / Save -->
+                <section id="panel-export" class="panel-section disabled">
+                    <h2 class="panel-title">
+                        <span class="step-badge">5</span>
+                        <span>Export & Share (Private)</span>
+                    </h2>
+                    <div class="panel-body">
+                        <p class="section-desc">Save your course and routes inside the image. You can share this image file; it contains all your data, but is fully private (stores nothing in the cloud).</p>
+                        
+                        <button id="btn-export-image-meta" class="btn-primary btn-full" style="margin-bottom: 10px; background: linear-gradient(135deg, #E6007E 0%, #db2777 100%); border: none;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Export PNG with Metadata
+                        </button>
+                        
+                        <div class="secondary-actions">
+                            <button id="btn-export-json" class="btn-secondary" style="flex: 1;" title="Export only JSON metadata text file">
+                                Save JSON
+                            </button>
+                            <button id="btn-import-json-trigger" class="btn-secondary" style="flex: 1;" title="Load metadata from a separate JSON file">
+                                Load JSON
+                            </button>
+                            <input type="file" id="json-file-input" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                </section>
+            </div>
+            
+            <footer class="sidebar-footer">
+                <span>Client-Side Only • No Cloud Uploads</span>
+            </footer>
+        </aside>
+
+        <!-- Main Interactive Canvas Area -->
+        <main id="canvas-area" class="canvas-viewport">
+            <div id="canvas-container" class="canvas-container">
+                <!-- Grid Background for empty state -->
+                <div id="canvas-empty-state" class="empty-state">
+                    <div class="empty-state-card">
+                        <h2>Welcome to SprintRoute</h2>
+                        <p>Upload a sprint orienteering map image to get started. All mapping, scaling, course planning, and route drawing will happen securely in your browser.</p>
+                        <div style="margin-top: 20px;">
+                            <label class="btn-primary cursor-pointer" style="padding: 10px 20px; font-size: 14px;">
+                                Select Map Image
+                                <input type="file" id="empty-file-input" accept="image/png, image/jpeg, image/webp" style="display: none;">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Main Canvas Element -->
+                <canvas id="map-canvas" style="display: none;"></canvas>
+            </div>
+
+            <!-- Floating Tool HUD overlay -->
+            <div id="tool-hud" class="floating-hud hud-top-left" style="display: none;">
+                <div class="hud-item">
+                    <span class="hud-label">Tool:</span>
+                    <span id="hud-active-tool" class="hud-value highlight">Pan & Zoom</span>
+                </div>
+                <div class="hud-item border-left">
+                    <span class="hud-label">Scale:</span>
+                    <span id="hud-scale-ratio" class="hud-value">Uncalibrated</span>
+                </div>
+            </div>
+
+            <!-- Floating View Controls (Zoom, Rotate) -->
+            <div id="view-controls" class="floating-hud hud-bottom-right" style="display: none;">
+                <button id="btn-rotate-ccw" class="hud-btn" title="Rotate Counter-Clockwise (Q)">↺</button>
+                <button id="btn-rotate-cw" class="hud-btn" title="Rotate Clockwise (E)">↻</button>
+                <button id="btn-zoom-out" class="hud-btn" title="Zoom Out (-)">−</button>
+                <span id="hud-zoom-percent" class="hud-text">100%</span>
+                <button id="btn-zoom-in" class="hud-btn" title="Zoom In (+)">+</button>
+                <button id="btn-reset-view" class="hud-btn" title="Reset Zoom and Rotation (R)">⛶</button>
+            </div>
+
+            <!-- Drawing HUD (Leg / Route Drawing Stats) -->
+            <div id="drawing-hud" class="floating-hud hud-top-right" style="display: none;">
+                <div class="drawing-hud-header">
+                    <span id="drawing-hud-title" class="drawing-hud-title">Leg S-1</span>
+                    <span id="drawing-hud-route-name" class="drawing-hud-route-name">Route Choice A</span>
+                </div>
+                <div class="drawing-hud-stats">
+                    <div class="stat-box">
+                        <span class="stat-label">Length</span>
+                        <span id="stat-route-length" class="stat-val">0m</span>
+                    </div>
+                    <div class="stat-box border-left">
+                        <span class="stat-label">Straight Line</span>
+                        <span id="stat-straight-length" class="stat-val">0m</span>
+                    </div>
+                    <div class="stat-box border-left">
+                        <span class="stat-label">Efficiency</span>
+                        <span id="stat-efficiency" class="stat-val">100%</span>
+                    </div>
+                    <div class="stat-box border-left">
+                        <span class="stat-label">Est. Time</span>
+                        <span id="stat-est-time" class="stat-val">0:00</span>
+                    </div>
+                </div>
+                <div class="drawing-hud-help">
+                    <span><strong>Click</strong> to place waypoints along your route. <strong>Click near the target control</strong> to finish. <kbd>Ctrl+Z</kbd> to undo last point.</span>
+                </div>
+            </div>
+
+            <!-- Calibration Banner Instructions -->
+            <div id="calibration-banner" class="banner-overlay" style="display: none;">
+                <div class="banner-content banner-warning">
+                    <span class="banner-title">Scale Calibration Mode</span>
+                    <span class="banner-message">Click Point 1 on the map, then click Point 2 to measure distance.</span>
+                    <button id="btn-exit-calibration" class="btn-banner-close">✕</button>
+                </div>
+            </div>
+
+            <!-- Canvas Toast Notifications -->
+            <div id="toast-container" class="toast-container"></div>
+        </main>
+    </div>
+
+    <!-- Calibration Dialog modal -->
+    <div id="modal-calibration-input" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <h3 class="modal-title">Enter Calibration Distance</h3>
+            <p class="modal-desc">You have measured a line of <strong id="modal-pixel-span">0</strong> pixels on the map.</p>
+            <div class="form-group">
+                <label for="input-modal-meters" class="form-label">What is the real-world distance of this line in meters?</label>
+                <input type="number" id="input-modal-meters" class="form-control" value="100" min="1">
+            </div>
+            <div class="modal-actions">
+                <button id="btn-modal-cal-cancel" class="btn-secondary">Cancel</button>
+                <button id="btn-modal-cal-save" class="btn-primary">Apply Scale</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Practice Completion Modal -->
+    <div id="modal-practice-complete" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="width: 460px;">
+            <h3 class="modal-title">🎉 Course Completed!</h3>
+            <p class="modal-desc">Excellent! You completed drawing your route choices for the entire course. Here is your practice run summary:</p>
+            <div id="practice-summary-content" class="info-card" style="margin-top: 5px; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-actions">
+                <button id="btn-modal-practice-close" class="btn-primary">Awesome!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata Found Modal - shown when loading image with embedded course data -->
+    <div id="modal-metadata-found" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="width: 520px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <span style="font-size: 28px;">🗺️</span>
+                <div>
+                    <h3 class="modal-title" style="margin-bottom: 2px;">Course Data Found!</h3>
+                    <p class="modal-desc" style="margin: 0;">This image contains embedded SprintRoute data. All your courses and routes have been restored.</p>
+                </div>
+            </div>
+            <div id="metadata-courses-summary" style="margin: 16px 0; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-actions" style="margin-top: 8px;">
+                <button id="btn-modal-metadata-close" class="btn-primary">Start Practicing!</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

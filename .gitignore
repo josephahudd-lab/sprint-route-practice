@@ -1,0 +1,15 @@
+# Byte-order mark and other potentially-large files
+*.bin
+*.dat
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor directories
+.vscode/
+.idea/
+
+# Node (not used here but just in case)
+node_modules/
