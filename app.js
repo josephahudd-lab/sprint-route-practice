@@ -1107,13 +1107,15 @@ function handleCanvasMouseDown(e) {
     
     // Course select / Drag and drop controls
     if (appMode === 'EDIT_COURSE') {
-        // Find if we clicked close to start, control, or finish
-        const clickToleranceScreen = 15; // pixels on screen
+        // Hit tolerance scales with zoom so it's always ~15px on screen regardless of zoom
+        const clickToleranceScreen = 15;
+        const zoomedRadius = SYMBOL_SIZES.controlRadius * viewTransform.zoom;
+        const hitRadius = Math.max(clickToleranceScreen, zoomedRadius);
         
         if (course.start) {
             const startScreen = mapToScreen(course.start.x, course.start.y);
             const dist = Math.sqrt((screenX - startScreen.x)**2 + (screenY - startScreen.y)**2);
-            if (dist <= clickToleranceScreen) {
+            if (dist <= hitRadius) {
                 draggedControl = { type: 'start' };
                 return;
             }
@@ -1122,7 +1124,7 @@ function handleCanvasMouseDown(e) {
         for (let i = 0; i < course.controls.length; i++) {
             const ctrlScreen = mapToScreen(course.controls[i].x, course.controls[i].y);
             const dist = Math.sqrt((screenX - ctrlScreen.x)**2 + (screenY - ctrlScreen.y)**2);
-            if (dist <= clickToleranceScreen) {
+            if (dist <= hitRadius) {
                 draggedControl = { type: 'control', index: i };
                 return;
             }
@@ -1131,7 +1133,7 @@ function handleCanvasMouseDown(e) {
         if (course.finish) {
             const finishScreen = mapToScreen(course.finish.x, course.finish.y);
             const dist = Math.sqrt((screenX - finishScreen.x)**2 + (screenY - finishScreen.y)**2);
-            if (dist <= clickToleranceScreen) {
+            if (dist <= hitRadius) {
                 draggedControl = { type: 'finish' };
                 return;
             }
@@ -1224,7 +1226,8 @@ function handleCanvasMouseUp(e) {
                         (e.offsetX - targetScreenPt.x)**2 + 
                         (e.offsetY - targetScreenPt.y)**2
                     );
-                    const snapToleranceScreen = 25;
+                    // Snap tolerance scales with zoom — always ~25px on screen but at least the symbol radius
+                    const snapToleranceScreen = Math.max(25, SYMBOL_SIZES.controlRadius * viewTransform.zoom);
                     
                     if (distToTarget <= snapToleranceScreen) {
                         // Clicked target control - snap and complete leg!
@@ -1481,27 +1484,35 @@ function varColor(cssVarName) {
 }
 
 function drawCourseAndRoutesScreenSpace() {
-    // 1. Draw connecting lines first (so they sit underneath control symbols)
+    const zoom = viewTransform.zoom;
+
+    // Zoom-scaled symbol sizes — symbols stay the same SIZE relative to the map
+    const CR  = SYMBOL_SIZES.controlRadius     * zoom;  // control circle radius
+    const SR  = SYMBOL_SIZES.startRadius       * zoom;  // start triangle circumradius
+    const FIR = SYMBOL_SIZES.finishInnerRadius * zoom;  // finish inner radius
+    const FOR = SYMBOL_SIZES.finishOuterRadius * zoom;  // finish outer radius
+    const FO  = SYMBOL_SIZES.fontOffset        * zoom;  // label offset
+    const LW  = Math.max(1, SYMBOL_SIZES.lineWidth * zoom);  // line width (min 1px)
+    const fontSize = Math.max(8, Math.round(14 * zoom));
+
+    // 1. Draw connecting lines first (underneath control symbols)
     const legs = getLegs();
     
-    ctx.lineWidth = SYMBOL_SIZES.lineWidth;
+    ctx.lineWidth = LW;
     ctx.strokeStyle = IOF_COLORS.purple;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
     legs.forEach(leg => {
-        // Project map points to screen space
         const p1 = mapToScreen(leg.startPt.x, leg.startPt.y);
         const p2 = mapToScreen(leg.endPt.x, leg.endPt.y);
         
-        // Calculate circle clip sizes
-        const isStart = leg.index === 0;
+        const isStart  = leg.index === 0;
         const isFinish = leg.index === course.controls.length;
         
-        const r1 = isStart ? SYMBOL_SIZES.startRadius : SYMBOL_SIZES.controlRadius;
-        const r2 = isFinish ? SYMBOL_SIZES.finishOuterRadius : SYMBOL_SIZES.controlRadius;
+        const r1 = isStart  ? SR  : CR;
+        const r2 = isFinish ? FOR : CR;
         
-        // Clip lines at circle boundaries to follow IOF sprint course standards
         const dx = p2.x - p1.x;
         const dy = p2.y - p1.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
@@ -1509,15 +1520,9 @@ function drawCourseAndRoutesScreenSpace() {
         if (dist > (r1 + r2)) {
             const ux = dx / dist;
             const uy = dy / dist;
-            
-            const startX = p1.x + ux * r1;
-            const startY = p1.y + uy * r1;
-            const endX = p2.x - ux * r2;
-            const endY = p2.y - uy * r2;
-            
             ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
+            ctx.moveTo(p1.x + ux * r1, p1.y + uy * r1);
+            ctx.lineTo(p2.x - ux * r2, p2.y - uy * r2);
             ctx.stroke();
         }
     });
@@ -1526,23 +1531,19 @@ function drawCourseAndRoutesScreenSpace() {
     if (course.start) {
         const s = mapToScreen(course.start.x, course.start.y);
         
-        // Point triangle in direction of Control 1 if it exists
-        let angle = -Math.PI / 2; // Default point UP
+        let angle = -Math.PI / 2;
         if (course.controls.length > 0) {
             const c1 = mapToScreen(course.controls[0].x, course.controls[0].y);
             angle = Math.atan2(c1.y - s.y, c1.x - s.x);
         }
         
-        ctx.lineWidth = SYMBOL_SIZES.controlLineWidth;
+        ctx.lineWidth = LW;
         ctx.strokeStyle = IOF_COLORS.purple;
-        
         ctx.beginPath();
-        const r = SYMBOL_SIZES.startRadius;
-        // Equilateral triangle around center (s.x, s.y) rotated by angle
         for (let i = 0; i < 3; i++) {
             const theta = angle + (i * 2 * Math.PI) / 3;
-            const x = s.x + r * Math.cos(theta);
-            const y = s.y + r * Math.sin(theta);
+            const x = s.x + SR * Math.cos(theta);
+            const y = s.y + SR * Math.sin(theta);
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         }
@@ -1550,72 +1551,58 @@ function drawCourseAndRoutesScreenSpace() {
         ctx.stroke();
     }
     
-    // 3. Draw Controls (Circles)
+    // 3. Draw Controls (Circles with number labels)
     course.controls.forEach(ctrl => {
         const c = mapToScreen(ctrl.x, ctrl.y);
         
-        ctx.lineWidth = SYMBOL_SIZES.controlLineWidth;
+        ctx.lineWidth = LW;
         ctx.strokeStyle = IOF_COLORS.purple;
-        
-        // Control circle
         ctx.beginPath();
-        ctx.arc(c.x, c.y, SYMBOL_SIZES.controlRadius, 0, Math.PI*2);
+        ctx.arc(c.x, c.y, CR, 0, Math.PI * 2);
         ctx.stroke();
         
-        // Control number (visual label outside the circle)
-        ctx.fillStyle = IOF_COLORS.purple;
-        ctx.font = 'bold 16px Outfit, Inter, sans-serif';
+        // Number label with white outline for visibility
+        ctx.font = `bold ${fontSize}px Outfit, Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
-        // Place text offset (default top-right, or we can adjust)
-        // Draw white outline behind text for visibility on dark/busy map details
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 4;
-        ctx.strokeText(ctrl.label, c.x + SYMBOL_SIZES.fontOffset, c.y - SYMBOL_SIZES.fontOffset + 4);
-        ctx.fillText(ctrl.label, c.x + SYMBOL_SIZES.fontOffset, c.y - SYMBOL_SIZES.fontOffset + 4);
+        ctx.lineWidth = Math.max(2, 4 * zoom);
+        ctx.strokeText(ctrl.label, c.x + FO, c.y - FO + fontSize * 0.2);
+        ctx.fillStyle = IOF_COLORS.purple;
+        ctx.fillText(ctrl.label, c.x + FO, c.y - FO + fontSize * 0.2);
     });
     
     // 4. Draw Finish (Double Circle)
     if (course.finish) {
         const f = mapToScreen(course.finish.x, course.finish.y);
         
-        ctx.lineWidth = SYMBOL_SIZES.controlLineWidth;
+        ctx.lineWidth = LW;
         ctx.strokeStyle = IOF_COLORS.purple;
-        
-        // Inner circle
         ctx.beginPath();
-        ctx.arc(f.x, f.y, SYMBOL_SIZES.finishInnerRadius, 0, Math.PI*2);
+        ctx.arc(f.x, f.y, FIR, 0, Math.PI * 2);
         ctx.stroke();
-        
-        // Outer circle
         ctx.beginPath();
-        ctx.arc(f.x, f.y, SYMBOL_SIZES.finishOuterRadius, 0, Math.PI*2);
+        ctx.arc(f.x, f.y, FOR, 0, Math.PI * 2);
         ctx.stroke();
     }
     
-    // 5. Draw Routes Choices
+    // 5. Draw Route Choices
     routes.forEach(route => {
-        // Filter by course
         if (route.courseId !== activeCourseId) return;
-        
-        // Filter by runner visibility
         if (visibleRunners[route.runnerName] === false) return;
-        
         if (!route.visible || route.points.length < 1) return;
         
         const isActiveLeg = route.legIndex === activeLegIndex;
         const isHighlightedRunner = window.highlightedRunner === route.runnerName;
         
-        ctx.lineWidth = isHighlightedRunner ? 6 : (isActiveLeg ? 4 : 2);
+        // Route lines scale with zoom so they stay a consistent width on the ground
+        const baseWidth = isHighlightedRunner ? 4 : (isActiveLeg ? 3 : 1.5);
+        ctx.lineWidth = Math.max(1, baseWidth * zoom);
         ctx.strokeStyle = route.color;
         
-        // Set opacity based on leg focus and runner highlight
-        if (window.highlightedRunner) {
-            ctx.globalAlpha = isHighlightedRunner ? 1.0 : 0.15;
-        } else {
-            ctx.globalAlpha = isActiveLeg ? 1.0 : 0.35;
-        }
+        ctx.globalAlpha = window.highlightedRunner
+            ? (isHighlightedRunner ? 1.0 : 0.15)
+            : (isActiveLeg ? 1.0 : 0.35);
         
         ctx.beginPath();
         route.points.forEach((pt, i) => {
@@ -1625,51 +1612,50 @@ function drawCourseAndRoutesScreenSpace() {
         });
         ctx.stroke();
         
-        // Draw start/end dots on path
+        // Small dot at start of route
         if (route.points.length > 0) {
             const sPt = mapToScreen(route.points[0].x, route.points[0].y);
             ctx.beginPath();
-            ctx.arc(sPt.x, sPt.y, 4, 0, Math.PI*2);
+            ctx.arc(sPt.x, sPt.y, Math.max(2, 3 * zoom), 0, Math.PI * 2);
             ctx.fillStyle = route.color;
             ctx.fill();
         }
         
-        ctx.globalAlpha = 1.0; // reset transparency
+        ctx.globalAlpha = 1.0;
     });
     
-    // 5b. Draw active route preview segment (dashed line to hover coordinate)
+    // 5b. Active route preview (dashed line to cursor)
     if (appMode === 'DRAWING_ROUTE' && drawingHoverPt) {
         const activeRoute = getActiveRoute();
         if (activeRoute && activeRoute.points.length > 0) {
             const lastPt = activeRoute.points[activeRoute.points.length - 1];
             const p1 = mapToScreen(lastPt.x, lastPt.y);
             const p2 = mapToScreen(drawingHoverPt.x, drawingHoverPt.y);
-            
+            const dashLen = Math.max(4, 6 * zoom);
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.lineWidth = 3;
+            ctx.lineWidth = Math.max(1, 2 * zoom);
             ctx.strokeStyle = activeRoute.color;
-            ctx.setLineDash([6, 6]);
+            ctx.setLineDash([dashLen, dashLen]);
             ctx.stroke();
-            ctx.setLineDash([]); // reset
+            ctx.setLineDash([]);
         }
     }
     
-    // 6. Highlight active dragged handle
+    // 6. Highlight draggable handles in EDIT_COURSE mode
     if (appMode === 'EDIT_COURSE') {
         const drawHandleGlow = (mx, my, rad) => {
             const scr = mapToScreen(mx, my);
             ctx.beginPath();
-            ctx.arc(scr.x, scr.y, rad + 4, 0, Math.PI*2);
+            ctx.arc(scr.x, scr.y, rad + Math.max(3, 4 * zoom), 0, Math.PI * 2);
             ctx.strokeStyle = IOF_COLORS.startCyan;
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = Math.max(1, 1.5 * zoom);
             ctx.stroke();
         };
-        
-        if (course.start) drawHandleGlow(course.start.x, course.start.y, SYMBOL_SIZES.startRadius);
-        course.controls.forEach(c => drawHandleGlow(c.x, c.y, SYMBOL_SIZES.controlRadius));
-        if (course.finish) drawHandleGlow(course.finish.x, course.finish.y, SYMBOL_SIZES.finishOuterRadius);
+        if (course.start)  drawHandleGlow(course.start.x,  course.start.y,  SR);
+        course.controls.forEach(c => drawHandleGlow(c.x, c.y, CR));
+        if (course.finish) drawHandleGlow(course.finish.x, course.finish.y, FOR);
     }
 }
 
