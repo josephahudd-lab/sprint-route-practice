@@ -835,23 +835,23 @@ body, html {
 }
 
 /* Canvas Viewport States */
-.canvas-viewport.panning #map-canvas {
+.canvas-container.panning #map-canvas {
     cursor: grab;
 }
 
-.canvas-viewport.panning.mousedown #map-canvas {
+.canvas-container.panning.mousedown #map-canvas {
     cursor: grabbing;
 }
 
-.canvas-viewport.drawing-route #map-canvas {
+.canvas-container.drawing-route #map-canvas {
     cursor: crosshair;
 }
 
-.canvas-viewport.course-edit #map-canvas {
+.canvas-container.course-edit #map-canvas {
     cursor: cell;
 }
 
-.canvas-viewport.calibrating #map-canvas {
+.canvas-container.calibrating #map-canvas {
     cursor: crosshair;
 }
 

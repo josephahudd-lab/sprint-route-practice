@@ -411,7 +411,7 @@ function setupEventListeners() {
     canvas.addEventListener('mousedown', handleCanvasMouseDown);
     canvas.addEventListener('mousemove', handleCanvasMouseMove);
     canvas.addEventListener('mouseup', handleCanvasMouseUp);
-    canvas.addEventListener('wheel', handleCanvasWheel);
+    canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // prevent context menu on canvas
 
     // Keyboard Shortcuts
@@ -629,9 +629,6 @@ function toggleTool(mode, buttonEl) {
         setAppMode('PAN_ZOOM');
     } else {
         setAppMode(mode);
-        // Deactivate other buttons
-        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-        if (buttonEl) buttonEl.classList.add('active');
     }
 }
 
@@ -1357,11 +1354,20 @@ function handleKeyDown(e) {
         }
     }
     
-    // Q / E for rotation shortcuts
+    // Q / E for rotation shortcuts, + / - for zoom shortcuts
     if (document.activeElement.tagName !== 'INPUT') {
         if (e.key.toLowerCase() === 'q') rotateMap(-5);
         if (e.key.toLowerCase() === 'e') rotateMap(5);
         if (e.key.toLowerCase() === 'r') resetView();
+        
+        if (e.key === '+' || e.key === '=') {
+            zoomMap(1.2);
+            e.preventDefault();
+        }
+        if (e.key === '-' || e.key === '_') {
+            zoomMap(0.85);
+            e.preventDefault();
+        }
         
         // Escape cancels current actions
         if (e.key === 'Escape') {
