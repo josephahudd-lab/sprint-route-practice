@@ -20,6 +20,7 @@
                     <h1 class="logo-title">Sprint<span class="highlight">Route</span></h1>
                 </div>
                 <p class="logo-subtitle">Private Route Choice Practice</p>
+                <button id="btn-open-hub" class="btn-open-hub" style="display:none;">🗺️ All Courses</button>
             </header>
 
             <div class="sidebar-scrollable">
@@ -281,6 +282,28 @@
 
         <!-- Main Interactive Canvas Area -->
         <main id="canvas-area" class="canvas-viewport">
+            <!-- Course Hub Overlay -->
+        <div id="course-hub" class="course-hub" style="display:none;">
+            <div class="course-hub-inner">
+                <div class="course-hub-header">
+                    <div class="hub-header-left">
+                        <span class="hub-logo-icon">▲</span>
+                        <div>
+                            <div class="hub-map-name" id="hub-map-name">map.png</div>
+                            <div class="hub-map-subtitle" id="hub-map-subtitle">Select a course to get started</div>
+                        </div>
+                    </div>
+                    <button id="btn-hub-close" class="btn-hub-close" title="Close hub and return to map">✕ Close</button>
+                </div>
+
+                <p class="hub-section-label">COURSES ON THIS MAP</p>
+
+                <div id="course-hub-grid" class="course-hub-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
             <div id="canvas-container" class="canvas-container">
                 <!-- Grid Background for empty state -->
                 <div id="canvas-empty-state" class="empty-state">
@@ -391,25 +414,6 @@
             </div>
             <div class="modal-actions">
                 <button id="btn-modal-practice-close" class="btn-primary">Awesome!</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Metadata Found Modal - shown when loading image with embedded course data -->
-    <div id="modal-metadata-found" class="modal-overlay" style="display: none;">
-        <div class="modal-card" style="width: 520px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                <span style="font-size: 28px;">🗺️</span>
-                <div>
-                    <h3 class="modal-title" style="margin-bottom: 2px;">Course Data Found!</h3>
-                    <p class="modal-desc" style="margin: 0;">This image contains embedded SprintRoute data. All your courses and routes have been restored.</p>
-                </div>
-            </div>
-            <div id="metadata-courses-summary" style="margin: 16px 0; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;">
-                <!-- Populated dynamically -->
-            </div>
-            <div class="modal-actions" style="margin-top: 8px;">
-                <button id="btn-modal-metadata-close" class="btn-primary">Start Practicing!</button>
             </div>
         </div>
     </div>

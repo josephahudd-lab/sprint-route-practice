@@ -132,8 +132,11 @@ let elModalCalibrationInput, elModalPixelSpan, elInputModalMeters, elBtnModalCal
 // Practice Mode elements
 let elBtnStartPractice, elModalPracticeComplete, elPracticeSummaryContent, elBtnModalPracticeClose;
 
-// Metadata found modal elements
-let elModalMetadataFound, elMetadataCoursesSummary, elBtnModalMetadataClose;
+// Metadata found modal elements (replaced by Course Hub)
+// let elModalMetadataFound, elMetadataCoursesSummary, elBtnModalMetadataClose;
+
+// Course Hub elements
+let elCourseHub, elCourseHubGrid, elHubMapName, elHubMapSubtitle, elBtnHubClose, elBtnOpenHub;
 
 
 // Multi-course & Runner Compare elements
@@ -240,10 +243,13 @@ function initDOM() {
     elPracticeSummaryContent = document.getElementById('practice-summary-content');
     elBtnModalPracticeClose = document.getElementById('btn-modal-practice-close');
 
-    // Metadata found modal elements
-    elModalMetadataFound = document.getElementById('modal-metadata-found');
-    elMetadataCoursesSummary = document.getElementById('metadata-courses-summary');
-    elBtnModalMetadataClose = document.getElementById('btn-modal-metadata-close');
+    // Course Hub elements
+    elCourseHub = document.getElementById('course-hub');
+    elCourseHubGrid = document.getElementById('course-hub-grid');
+    elHubMapName = document.getElementById('hub-map-name');
+    elHubMapSubtitle = document.getElementById('hub-map-subtitle');
+    elBtnHubClose = document.getElementById('btn-hub-close');
+    elBtnOpenHub = document.getElementById('btn-open-hub');
 
 
     // Course switcher references
@@ -389,9 +395,11 @@ function setupEventListeners() {
     elBtnModalPracticeClose.addEventListener('click', () => {
         elModalPracticeComplete.style.display = 'none';
     });
-    elBtnModalMetadataClose.addEventListener('click', () => {
-        elModalMetadataFound.style.display = 'none';
-    });
+
+    // Course Hub event listeners
+    elBtnHubClose.addEventListener('click', hideCourseHub);
+    elBtnOpenHub.addEventListener('click', showCourseHub);
+
 
 
     // Course switcher event listeners
@@ -448,12 +456,10 @@ function handleImageUpload(file) {
             // Set initial viewport transforms
             resetView();
             
-            // Load scanned project data or start fresh
+            // Load scanned project data if present, otherwise reset to fresh defaults
             if (scannedProject) {
                 loadProjectData(scannedProject);
-                showMetadataFoundModal(scannedProject);
             } else {
-
                 setAppMode('PAN_ZOOM');
                 courses = [{ id: 'course-default', name: 'Course 1', start: null, controls: [], finish: null }];
                 activeCourseId = 'course-default';
@@ -464,9 +470,10 @@ function handleImageUpload(file) {
                 updateCourseList();
                 updateLegSelectionOptions();
                 updateRunnerComparisonList();
-                showToast('Map image loaded successfully. Calibrate scale next.', 'info');
             }
-            
+
+            // Always show the Course Hub after loading
+            showCourseHub();
             saveToLocalStorage();
         };
         img.src = imageUrl;
@@ -1777,6 +1784,10 @@ function importJsonFile(e) {
     const reader = new FileReader();
     reader.onload = function(evt) {
         try {
+            // Load scanned project data or start fresh
+            if (scannedProject) {
+                loadProjectData(scannedProject);
+            }
             const project = JSON.parse(evt.target.result);
             loadProjectData(project);
             showToast("JSON metadata successfully imported!", "success");
@@ -1984,6 +1995,9 @@ function resetSession() {
     elCanvas.style.display = 'none';
     elEmptyState.style.display = 'flex';
     elMapInfoCard.style.display = 'none';
+    elBtnOpenHub.style.display = 'none';
+    hideCourseHub();
+
     
     elPanelCalibration.classList.add('disabled');
     elPanelCourse.classList.add('disabled');
@@ -2223,76 +2237,148 @@ function showPracticeCompletionSummary() {
 
 
 
-// --- Metadata Found Modal ---
-function showMetadataFoundModal(project) {
-    elMetadataCoursesSummary.innerHTML = '';
-    
-    const projectCourses = project.courses || [];
-    const projectRoutes = project.routes || [];
-    
-    if (projectCourses.length === 0) {
-        elMetadataCoursesSummary.innerHTML = '<p style="color: var(--text-muted); text-align: center; font-size: 12px;">No courses found in metadata.</p>';
-    } else {
-        projectCourses.forEach(c => {
-            const courseRoutes = projectRoutes.filter(r => r.courseId === c.id || (!r.courseId && c.id === projectCourses[0].id));
-            
-            // Count unique runners
-            const runners = [...new Set(courseRoutes.map(r => r.runnerName).filter(Boolean))];
-            const controlCount = (c.controls || []).length;
-            const hasStart = !!c.start;
-            const hasFinish = !!c.finish;
-            
-            const card = document.createElement('div');
-            card.className = 'info-card';
-            card.style.cssText = `
-                padding: 12px 16px;
-                border: 1px solid var(--border-color);
-                border-radius: var(--border-radius-md);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                cursor: pointer;
-                transition: border-color 0.2s;
-            `;
-            
-            const left = document.createElement('div');
-            left.innerHTML = `
-                <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">${c.name}</div>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                    ${hasStart ? '▲ Start' : ''} 
-                    ${controlCount > 0 ? `• ${controlCount} Control${controlCount > 1 ? 's' : ''}` : ''} 
-                    ${hasFinish ? '• ◎ Finish' : ''}
-                </div>
-            `;
-            
-            const right = document.createElement('div');
-            right.style.cssText = 'text-align: right;';
-            
-            if (runners.length > 0) {
-                right.innerHTML = `
-                    <div style="font-size: 12px; color: var(--accent-cyan); font-weight: 600;">${courseRoutes.length} route${courseRoutes.length !== 1 ? 's' : ''}</div>
-                    <div style="font-size: 10px; color: var(--text-muted);">by: ${runners.join(', ')}</div>
-                `;
-            } else {
-                right.innerHTML = `<div style="font-size: 11px; color: var(--text-muted);">No routes yet</div>`;
-            }
-            
-            card.appendChild(left);
-            card.appendChild(right);
-            
-            // Clicking a course card switches to that course
-            card.addEventListener('click', () => {
-                selectCourse(c.id);
-                elModalMetadataFound.style.display = 'none';
-            });
-            card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--accent-magenta)'; });
-            card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border-color)'; });
-            
-            elMetadataCoursesSummary.appendChild(card);
-        });
+
+// --- Course Hub ---
+function showCourseHub() {
+    if (!mapImage) return;
+
+    // Header info
+    elHubMapName.textContent = originalFileName;
+    const scaleText = scale ? `Scale calibrated · 1px = ${scale.toFixed(3)}m` : 'Scale not yet calibrated';
+    elHubMapSubtitle.textContent = scaleText;
+
+    // Show sidebar button
+    elBtnOpenHub.style.display = 'block';
+
+    // Sync current course state
+    const curCourse = courses.find(c => c.id === activeCourseId);
+    if (curCourse) {
+        curCourse.start = course.start;
+        curCourse.controls = [...course.controls];
+        curCourse.finish = course.finish;
     }
-    
-    elModalMetadataFound.style.display = 'flex';
+
+    // Build grid
+    elCourseHubGrid.innerHTML = '';
+
+    if (courses.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'hub-empty-state';
+        emptyDiv.innerHTML = `
+            <div class="hub-empty-icon">🗺️</div>
+            <h3 class="hub-empty-title">No courses yet</h3>
+            <p class="hub-empty-desc">Create your first course to start planning route choices.</p>
+            <button class="btn-primary" id="hub-btn-create-first" style="margin: 0 auto;">+ Create First Course</button>
+        `;
+        elCourseHubGrid.appendChild(emptyDiv);
+        document.getElementById('hub-btn-create-first').addEventListener('click', () => {
+            hideCourseHub();
+            createNewCourse();
+        });
+    } else {
+        courses.forEach(c => {
+            const card = buildCourseCard(c);
+            elCourseHubGrid.appendChild(card);
+        });
+
+        // Add New Course card
+        const addBtn = document.createElement('button');
+        addBtn.className = 'course-card-add';
+        addBtn.innerHTML = `
+            <span class="course-card-add-icon">+</span>
+            <span class="course-card-add-label">Add New Course</span>
+            <span class="course-card-add-hint">Design another route on this map</span>
+        `;
+        addBtn.addEventListener('click', () => {
+            hideCourseHub();
+            createNewCourse();
+        });
+        elCourseHubGrid.appendChild(addBtn);
+    }
+
+    elCourseHub.style.display = 'flex';
+}
+
+function hideCourseHub() {
+    elCourseHub.style.display = 'none';
+}
+
+function buildCourseCard(c) {
+    const courseRoutes = routes.filter(r => r.courseId === c.id && r.points.length >= 2);
+    const runners = [...new Set(courseRoutes.map(r => r.runnerName).filter(Boolean))];
+    const controlCount = (c.controls || []).length;
+    const hasStart = !!c.start;
+    const hasFinish = !!c.finish;
+
+    // Build leg-badge parts
+    const parts = [];
+    if (hasStart) parts.push('▲ Start');
+    if (controlCount > 0) parts.push(`${controlCount} Control${controlCount !== 1 ? 's' : ''}`);
+    if (hasFinish) parts.push('◎ Finish');
+    const hasControls = parts.length > 0;
+
+    // Total legs
+    const legCount = Math.max(0, (hasStart ? 1 : 0) + controlCount + (hasFinish ? 1 : 0) - 1);
+
+    // Runner chips HTML
+    const runnerHtml = runners.length > 0
+        ? runners.map(r => {
+            const rRoutes = courseRoutes.filter(rt => rt.runnerName === r).length;
+            return `<span class="runner-chip"><span class="runner-chip-dot"></span>${r} · ${rRoutes} route${rRoutes !== 1 ? 's' : ''}</span>`;
+          }).join('')
+        : '<span class="no-routes-label">No routes drawn yet</span>';
+
+    const card = document.createElement('div');
+    card.className = 'course-card';
+    card.innerHTML = `
+        <div class="course-card-accent"></div>
+        <div class="course-card-body">
+            <div>
+                <h3 class="course-card-name">${c.name}</h3>
+                <div class="course-card-legs">
+                    ${hasControls
+                        ? parts.map(p => `<span class="course-leg-badge">${p}</span>`).join('')
+                        : '<span class="no-routes-label">No controls placed yet</span>'}
+                    ${legCount > 0 ? `<span class="course-leg-badge" style="border-color:rgba(230,0,126,0.25);color:var(--accent-magenta);">${legCount} leg${legCount !== 1 ? 's' : ''}</span>` : ''}
+                </div>
+            </div>
+            <div class="course-card-runners">${runnerHtml}</div>
+        </div>
+        <div class="course-card-actions">
+            <button class="btn-card-action primary" data-cid="${c.id}" data-action="practice">▶ Practice</button>
+            <button class="btn-card-action" data-cid="${c.id}" data-action="view">👁 View</button>
+            <button class="btn-card-action" data-cid="${c.id}" data-action="edit">✏ Edit</button>
+        </div>
+    `;
+
+    card.querySelector('[data-action="practice"]').addEventListener('click', () => {
+        selectCourse(c.id);
+        hideCourseHub();
+        const legs = getLegs();
+        if (legs.length === 0) {
+            showToast('Add a Start and at least one Control before practicing.', 'warning');
+            toggleTool('ADD_CONTROL', elBtnToolControl);
+        } else {
+            startPracticeMode();
+        }
+    });
+
+    card.querySelector('[data-action="view"]').addEventListener('click', () => {
+        selectCourse(c.id);
+        hideCourseHub();
+        setActiveLeg(-1);
+        resetView();
+        showToast(`Viewing all routes for ${c.name}`, 'info');
+    });
+
+    card.querySelector('[data-action="edit"]').addEventListener('click', () => {
+        selectCourse(c.id);
+        hideCourseHub();
+        setAppMode('PAN_ZOOM');
+        showToast(`Editing ${c.name} — use the Course Designer tools in the sidebar.`, 'info');
+    });
+
+    return card;
 }
 
 // --- Course Switcher Logic ---
