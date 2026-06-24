@@ -304,6 +304,84 @@
             </div>
         </div>
 
+        <!-- Map Setup Wizard Overlay -->
+        <div id="setup-wizard" class="course-hub" style="display:none;">
+            <div class="course-hub-inner" style="max-width: 500px;">
+                <div class="course-hub-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
+                    <div class="hub-header-left">
+                        <span class="hub-logo-icon">▲</span>
+                        <div>
+                            <div class="hub-map-name" id="wizard-map-name">map.png</div>
+                            <div class="hub-map-subtitle">New Map Setup Guide</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 1: Scale Calibration -->
+                <div id="wizard-step-1" class="wizard-step-content">
+                    <h3 style="font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 8px;">Step 1 of 2: Calibrate Map Scale</h3>
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px;">
+                        To calculate real-world distances and running times for your route choices, SprintRoute needs to know the map's scale. Choose a calibration method:
+                    </p>
+
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Option A: Scale and DPI -->
+                        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 14px;">
+                            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 10px;">Method A: Set Scale & Resolution (Fastest)</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 9px;">Map Scale (1 : X)</label>
+                                    <div class="input-with-addon">
+                                        <span class="addon-prefix">1 :</span>
+                                        <input type="number" id="wizard-input-scale" class="form-control" value="4000" style="padding-top: 4px; padding-bottom: 4px; height: 28px;">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 9px;">Resolution (DPI)</label>
+                                    <input type="number" id="wizard-input-dpi" class="form-control" value="300" style="padding-top: 4px; padding-bottom: 4px; height: 28px;">
+                                </div>
+                            </div>
+                            <button id="btn-wizard-apply-dpi" class="btn-primary btn-full btn-sm">Apply DPI & Scale</button>
+                        </div>
+
+                        <!-- Option B: Manual Ruler -->
+                        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+                            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Method B: Draw Calibration Line (Most Precise)</h4>
+                            <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                                Click two points on the map with a known distance (e.g. scale bar or building side).
+                            </p>
+                            <button id="btn-wizard-start-ruler" class="btn-secondary btn-full btn-sm" style="border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(6, 182, 212, 0.04);">
+                                📏 Draw Calibration Line on Map
+                            </button>
+                        </div>
+
+                        <!-- Option C: Skip -->
+                        <button id="btn-wizard-skip-cal" class="btn-text-danger" style="margin: 8px auto 0 auto; display: block; font-size: 11px; text-decoration: none; color: var(--text-muted);">
+                            Skip scale calibration for now (measure in pixels)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 2: Create First Course -->
+                <div id="wizard-step-2" class="wizard-step-content" style="display: none;">
+                    <h3 style="font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--accent-magenta); margin-bottom: 8px;">Step 2 of 2: Create Your First Course</h3>
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px;">
+                        Calibration complete! Now, let's create your first practice course on this map. You'll then be guided to place the start and control points.
+                    </p>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label for="wizard-input-course-name" class="form-label">Course Name</label>
+                        <input type="text" id="wizard-input-course-name" class="form-control" value="Course 1" placeholder="e.g. Sprint Short">
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-wizard-back" class="btn-secondary btn-sm" style="flex: 1;">Back</button>
+                        <button id="btn-wizard-create-course" class="btn-primary btn-sm" style="flex: 2; background: linear-gradient(135deg, var(--accent-magenta) 0%, #db2777 100%); box-shadow: 0 4px 12px rgba(230, 0, 126, 0.25);">Create Course & Start Placing Controls</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
             <div id="canvas-container" class="canvas-container">
                 <!-- Grid Background for empty state -->
                 <div id="canvas-empty-state" class="empty-state">
@@ -374,12 +452,12 @@
                 </div>
             </div>
 
-            <!-- Calibration Banner Instructions -->
-            <div id="calibration-banner" class="banner-overlay" style="display: none;">
-                <div class="banner-content banner-warning">
-                    <span class="banner-title">Scale Calibration Mode</span>
-                    <span class="banner-message">Click Point 1 on the map, then click Point 2 to measure distance.</span>
-                    <button id="btn-exit-calibration" class="btn-banner-close">✕</button>
+            <!-- Guidance Banner Instructions -->
+            <div id="guidance-banner" class="banner-overlay" style="display: none;">
+                <div class="banner-content">
+                    <span class="banner-title" id="guidance-banner-title">Scale Calibration Mode</span>
+                    <span class="banner-message" id="guidance-banner-message">Click Point 1 on the map, then click Point 2 to measure distance.</span>
+                    <button id="btn-exit-guidance" class="btn-banner-close">✕ Cancel</button>
                 </div>
             </div>
 

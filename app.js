@@ -109,7 +109,7 @@ window.addEventListener('DOMContentLoaded', () => {
     showToast('Welcome to SprintRoute! Load a map to begin.', 'info');
 });
 
-// --- DOM References ---
+/// --- DOM References ---
 let elDropzone, elFileInput, elEmptyFileInput, elJsonFileInput;
 let elEmptyState, elCanvas;
 let elPanelCalibration, elPanelCourse, elPanelPractice, elPanelExport;
@@ -125,9 +125,13 @@ let elBtnExportImageMeta, elBtnExportJson, elBtnImportJsonTrigger;
 let elToolHud, elHudActiveTool, elHudScaleRatio, elViewControls;
 let elBtnRotateCcw, elBtnRotateCw, elBtnZoomOut, elBtnZoomIn, elBtnResetView, elHudZoomPercent;
 let elDrawingHud, elDrawingHudTitle, elDrawingHudRouteName, elStatRouteLength, elStatStraightLength, elStatEfficiency, elStatEstTime;
-let elCalibrationBanner, elBtnExitCalibration;
+let elGuidanceBanner, elGuidanceBannerTitle, elGuidanceBannerMessage, elBtnExitGuidance;
 // Modal dialog
 let elModalCalibrationInput, elModalPixelSpan, elInputModalMeters, elBtnModalCalCancel, elBtnModalCalSave;
+
+// Setup Wizard elements
+let elSetupWizard, elWizardMapName, elWizardInputScale, elWizardInputDpi, elWizardInputCourseName;
+let elBtnWizardApplyDpi, elBtnWizardStartRuler, elBtnWizardSkipCal, elBtnWizardBack, elBtnWizardCreateCourse;
 
 // Practice Mode elements
 let elBtnStartPractice, elModalPracticeComplete, elPracticeSummaryContent, elBtnModalPracticeClose;
@@ -226,9 +230,11 @@ function initDOM() {
     elStatEfficiency = document.getElementById('stat-efficiency');
     elStatEstTime = document.getElementById('stat-est-time');
     
-    // Banner overlay
-    elCalibrationBanner = document.getElementById('calibration-banner');
-    elBtnExitCalibration = document.getElementById('btn-exit-calibration');
+    // Dynamic Guidance Banner
+    elGuidanceBanner = document.getElementById('guidance-banner');
+    elGuidanceBannerTitle = document.getElementById('guidance-banner-title');
+    elGuidanceBannerMessage = document.getElementById('guidance-banner-message');
+    elBtnExitGuidance = document.getElementById('btn-exit-guidance');
     
     // Modal dialog
     elModalCalibrationInput = document.getElementById('modal-calibration-input');
@@ -242,7 +248,7 @@ function initDOM() {
     elModalPracticeComplete = document.getElementById('modal-practice-complete');
     elPracticeSummaryContent = document.getElementById('practice-summary-content');
     elBtnModalPracticeClose = document.getElementById('btn-modal-practice-close');
-
+ 
     // Course Hub elements
     elCourseHub = document.getElementById('course-hub');
     elCourseHubGrid = document.getElementById('course-hub-grid');
@@ -250,8 +256,19 @@ function initDOM() {
     elHubMapSubtitle = document.getElementById('hub-map-subtitle');
     elBtnHubClose = document.getElementById('btn-hub-close');
     elBtnOpenHub = document.getElementById('btn-open-hub');
-
-
+ 
+    // Setup Wizard elements
+    elSetupWizard = document.getElementById('setup-wizard');
+    elWizardMapName = document.getElementById('wizard-map-name');
+    elWizardInputScale = document.getElementById('wizard-input-scale');
+    elWizardInputDpi = document.getElementById('wizard-input-dpi');
+    elWizardInputCourseName = document.getElementById('wizard-input-course-name');
+    elBtnWizardApplyDpi = document.getElementById('btn-wizard-apply-dpi');
+    elBtnWizardStartRuler = document.getElementById('btn-wizard-start-ruler');
+    elBtnWizardSkipCal = document.getElementById('btn-wizard-skip-cal');
+    elBtnWizardBack = document.getElementById('btn-wizard-back');
+    elBtnWizardCreateCourse = document.getElementById('btn-wizard-create-course');
+ 
     // Course switcher references
     elSelectCourse = document.getElementById('select-course');
     elBtnAddCourse = document.getElementById('btn-add-course');
@@ -362,7 +379,17 @@ function setupEventListeners() {
         setActiveLeg(val);
     });
     elBtnAddRoute.addEventListener('click', addNewRouteChoice);
-    elBtnExitCalibration.addEventListener('click', () => setAppMode('PAN_ZOOM'));
+    elBtnExitGuidance.addEventListener('click', () => {
+        if (appMode === 'ADD_CONTROL') {
+            if (course.controls.length > 0) {
+                setAppMode('ADD_FINISH');
+            } else {
+                setAppMode('PAN_ZOOM');
+            }
+        } else {
+            setAppMode('PAN_ZOOM');
+        }
+    });
 
     // Pace setting
     elInputRunPaceMin.addEventListener('input', (e) => {
@@ -415,6 +442,13 @@ function setupEventListeners() {
         updateRunnerComparisonList();
         saveToLocalStorage();
     });
+
+    // Setup Wizard event listeners
+    elBtnWizardApplyDpi.addEventListener('click', applyWizardDpiScale);
+    elBtnWizardStartRuler.addEventListener('click', startWizardRulerCalibration);
+    elBtnWizardSkipCal.addEventListener('click', skipWizardCalibration);
+    elBtnWizardBack.addEventListener('click', () => showWizardStep(1));
+    elBtnWizardCreateCourse.addEventListener('click', createFirstCourseFromWizard);
 }
 
 // --- Map Image Upload and Reading ---
@@ -461,7 +495,16 @@ function handleImageUpload(file) {
                 loadProjectData(scannedProject);
             } else {
                 setAppMode('PAN_ZOOM');
-                courses = [{ id: 'course-default', name: 'Course 1', start: null, controls: [], finish: null }];
+                scale = null;
+                courses = [
+                    {
+                        id: 'course-default',
+                        name: 'Course 1',
+                        start: null,
+                        controls: [],
+                        finish: null
+                    }
+                ];
                 activeCourseId = 'course-default';
                 course = courses[0];
                 routes = [];
@@ -472,8 +515,8 @@ function handleImageUpload(file) {
                 updateRunnerComparisonList();
             }
 
-            // Always show the Course Hub after loading
-            showCourseHub();
+            // Decide whether to show Course Hub or Setup Wizard
+            showHubOrWizard();
             saveToLocalStorage();
         };
         img.src = imageUrl;
@@ -555,6 +598,12 @@ function startRulerCalibration() {
 function cancelRulerCalibration() {
     calibrationPoints = [];
     setAppMode('PAN_ZOOM');
+    
+    if (window.isWizardCalibrationActive) {
+        window.isWizardCalibrationActive = false;
+        elSetupWizard.style.display = 'flex';
+        showWizardStep(1);
+    }
 }
 
 function saveRulerCalibration() {
@@ -589,8 +638,8 @@ function toggleTool(mode, buttonEl) {
 function addCourseElement(mapPoint) {
     if (appMode === 'ADD_START') {
         course.start = mapPoint;
-        setAppMode('EDIT_COURSE'); // Switch to Edit
-        showToast('Start triangle placed. Connect controls next.', 'info');
+        setAppMode('ADD_CONTROL'); // Switch to Add Control sequentially
+        showToast('Start triangle placed! Now click on the map to add Controls.', 'success');
     } else if (appMode === 'ADD_CONTROL') {
         const nextLabel = (course.controls.length + 1).toString();
         course.controls.push({
@@ -598,11 +647,11 @@ function addCourseElement(mapPoint) {
             y: mapPoint.y,
             label: nextLabel
         });
-        showToast(`Control ${nextLabel} placed.`, 'info');
+        showToast(`Control ${nextLabel} placed. Click map to add more, or click 'Done' in the banner to add Finish ◎.`, 'info');
     } else if (appMode === 'ADD_FINISH') {
         course.finish = mapPoint;
-        setAppMode('EDIT_COURSE');
-        showToast('Finish placed. Course setup complete.', 'info');
+        setAppMode('EDIT_COURSE'); // Switch to adjust/move controls mode
+        showToast('Finish placed! Course setup complete. You can drag controls to adjust them, or select a leg to practice.', 'success');
     }
     
     updateCourseList();
@@ -1353,7 +1402,7 @@ function setAppMode(mode) {
     
     // Reset buttons
     document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-    elCalibrationBanner.style.display = 'none';
+    if (elGuidanceBanner) elGuidanceBanner.style.display = 'none';
     elRulerCalHud.style.display = 'none';
     
     // Remove cursor classes
@@ -1393,13 +1442,13 @@ function setAppMode(mode) {
             break;
         case 'RULER_CALIBRATING':
             toolName = "Ruler Calibration";
-            elCalibrationBanner.style.display = 'block';
             elRulerCalHud.style.display = 'block';
             canvas.parentElement.classList.add('calibrating');
             break;
     }
     
     elHudActiveTool.textContent = toolName;
+    updateGuidanceBanner();
     requestRepaint();
 }
 
@@ -1416,6 +1465,12 @@ function applyModalCalibration() {
     setAppMode('PAN_ZOOM');
     showToast(`Manual scale calibrated: 1 pixel = ${scale.toFixed(4)}m`, 'success');
     saveToLocalStorage();
+    
+    if (window.isWizardCalibrationActive) {
+        window.isWizardCalibrationActive = false;
+        elSetupWizard.style.display = 'flex';
+        showWizardStep(2);
+    }
 }
 
 // --- Rendering / Painting Engine ---
@@ -1784,13 +1839,10 @@ function importJsonFile(e) {
     const reader = new FileReader();
     reader.onload = function(evt) {
         try {
-            // Load scanned project data or start fresh
-            if (scannedProject) {
-                loadProjectData(scannedProject);
-            }
             const project = JSON.parse(evt.target.result);
             loadProjectData(project);
             showToast("JSON metadata successfully imported!", "success");
+            showHubOrWizard();
             saveToLocalStorage();
         } catch (err) {
             console.error("JSON parsing error", err);
@@ -1997,6 +2049,8 @@ function resetSession() {
     elMapInfoCard.style.display = 'none';
     elBtnOpenHub.style.display = 'none';
     hideCourseHub();
+    hideSetupWizard();
+    window.isWizardCalibrationActive = false;
 
     
     elPanelCalibration.classList.add('disabled');
@@ -2236,6 +2290,175 @@ function showPracticeCompletionSummary() {
 }
 
 
+
+
+// --- Map Setup Onboarding Wizard & Guidance Banner ---
+function showHubOrWizard() {
+    // A map is considered "fresh" if scale is null AND we have no courses with actual points
+    const isFreshMap = (scale === null) && (!courses || courses.length === 0 || (courses.length === 1 && !courses[0].start && courses[0].controls.length === 0 && !courses[0].finish));
+    if (isFreshMap) {
+        showSetupWizard();
+    } else {
+        showCourseHub();
+    }
+}
+
+function showSetupWizard() {
+    if (!mapImage) return;
+
+    elWizardMapName.textContent = originalFileName;
+    hideCourseHub();
+    showWizardStep(1);
+    elSetupWizard.style.display = 'flex';
+}
+
+function hideSetupWizard() {
+    elSetupWizard.style.display = 'none';
+}
+
+function showWizardStep(stepNum) {
+    if (stepNum === 1) {
+        document.getElementById('wizard-step-1').style.display = 'block';
+        document.getElementById('wizard-step-2').style.display = 'none';
+    } else if (stepNum === 2) {
+        document.getElementById('wizard-step-1').style.display = 'none';
+        document.getElementById('wizard-step-2').style.display = 'block';
+        
+        // Populate and select course name input
+        elWizardInputCourseName.value = `Course 1`;
+        elWizardInputCourseName.focus();
+        elWizardInputCourseName.select();
+    }
+}
+
+function applyWizardDpiScale() {
+    const wizardScaleVal = parseInt(elWizardInputScale.value) || 4000;
+    const wizardDpiVal = parseInt(elWizardInputDpi.value) || 300;
+    
+    // Sync sidebar fields
+    elInputMapScale.value = wizardScaleVal;
+    elInputDpi.value = wizardDpiVal;
+    
+    // Apply scale calibration
+    applyDpiScale();
+    
+    // Advance step
+    showWizardStep(2);
+}
+
+function startWizardRulerCalibration() {
+    window.isWizardCalibrationActive = true;
+    hideSetupWizard();
+    startRulerCalibration();
+}
+
+function skipWizardCalibration() {
+    scale = null;
+    updateCalibrationUI();
+    showWizardStep(2);
+}
+
+function createFirstCourseFromWizard() {
+    const courseName = elWizardInputCourseName.value.trim() || 'Course 1';
+    
+    // Re-initialize courses with this one course
+    const newId = 'course-default';
+    courses = [
+        {
+            id: newId,
+            name: courseName,
+            start: null,
+            controls: [],
+            finish: null
+        }
+    ];
+    activeCourseId = newId;
+    course = courses[0];
+    routes = [];
+    visibleRunners = {};
+    
+    // Sync sidebar elements
+    updateCourseSelectDropdown();
+    updateCourseList();
+    updateLegSelectionOptions();
+    updateRunnerComparisonList();
+    
+    hideSetupWizard();
+    saveToLocalStorage();
+    
+    // Automatically switch to Add Start mode!
+    setAppMode('ADD_START');
+    showToast(`Course "${courseName}" created! Click on the map to place the Start Triangle ▲.`, 'success');
+}
+
+function updateGuidanceBanner() {
+    if (!elGuidanceBanner) return;
+    
+    // Check if we should display it
+    const activeModes = ['RULER_CALIBRATING', 'ADD_START', 'ADD_CONTROL', 'ADD_FINISH', 'EDIT_COURSE', 'DRAWING_ROUTE'];
+    if (!activeModes.includes(appMode)) {
+        elGuidanceBanner.style.display = 'none';
+        return;
+    }
+    
+    let title = "";
+    let message = "";
+    let closeLabel = "✕ Cancel";
+    let accentColor = "var(--accent-cyan)";
+    let shadowColor = "rgba(6, 182, 212, 0.25)";
+    
+    if (appMode === 'RULER_CALIBRATING') {
+        title = "Scale Calibration Mode";
+        message = "Click Point 1 on the map, then click Point 2 to measure distance.";
+        closeLabel = "✕ Cancel";
+        accentColor = "var(--accent-cyan)";
+        shadowColor = "rgba(6, 182, 212, 0.25)";
+    } else if (appMode === 'ADD_START') {
+        title = "Course Designer: Start Triangle";
+        message = "Click on the map to place the Start Triangle ▲";
+        closeLabel = "✕ Cancel";
+        accentColor = "var(--accent-magenta)";
+        shadowColor = "rgba(230, 0, 126, 0.25)";
+    } else if (appMode === 'ADD_CONTROL') {
+        title = "Course Designer: Controls";
+        message = "Click on the map to place Control circles sequentially. Click 'Done' when done.";
+        closeLabel = "✕ Done";
+        accentColor = "var(--accent-magenta)";
+        shadowColor = "rgba(230, 0, 126, 0.25)";
+    } else if (appMode === 'ADD_FINISH') {
+        title = "Course Designer: Finish Double-Circle";
+        message = "Click on the map to place the Finish Double-Circle ◎";
+        closeLabel = "✕ Cancel";
+        accentColor = "var(--accent-magenta)";
+        shadowColor = "rgba(230, 0, 126, 0.25)";
+    } else if (appMode === 'EDIT_COURSE') {
+        title = "Course Designer: Edit Mode";
+        message = "Click and drag any start, control, or finish point on the map to adjust it.";
+        closeLabel = "✕ Done";
+        accentColor = "var(--accent-cyan)";
+        shadowColor = "rgba(6, 182, 212, 0.25)";
+    } else if (appMode === 'DRAWING_ROUTE') {
+        const route = getActiveRoute();
+        title = `Drawing Route: ${route ? route.name : ''}`;
+        message = "Click on the map to place route waypoints. Click near the target control circle to complete the leg.";
+        closeLabel = "✕ Cancel";
+        accentColor = "var(--accent-cyan)";
+        shadowColor = "rgba(6, 182, 212, 0.25)";
+    }
+    
+    elGuidanceBannerTitle.textContent = title;
+    elGuidanceBannerMessage.textContent = message;
+    elBtnExitGuidance.textContent = closeLabel;
+    
+    const contentEl = elGuidanceBanner.querySelector('.banner-content');
+    if (contentEl) {
+        contentEl.style.borderColor = accentColor;
+        contentEl.style.boxShadow = `0 0 20px ${shadowColor}`;
+        elGuidanceBannerTitle.style.color = accentColor;
+    }
+    
+    elGuidanceBanner.style.display = 'block';
+}
 
 
 // --- Course Hub ---
